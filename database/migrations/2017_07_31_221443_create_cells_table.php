@@ -14,12 +14,14 @@ class CreateCellsTable extends Migration
     public function up()
     {
         Schema::create('cells', function (Blueprint $table) {
-            $table->increments('id');
+            $table->uuid('id');
             $table->integer('map_id')->unsigned();
             $table->integer('x')->unsigned();
             $table->integer('y')->unsigned();
             $table->json('data')->nullable();
+            $table->integer('version')->unsigned()->default(0);
             $table->timestamps();
+            $table->primary('id');
             $table->foreign('map_id')->references('id')->on('map')->onDelete('cascade');
         });
     }

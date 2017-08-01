@@ -4,32 +4,44 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use OutOfBoundsException;
 
 class Map extends Model
 {
-    use SoftDeletes;
-    
+    use SoftDeletes,
+        Concerns\HasUuid;
+
     protected $fillable = ['name', 'width', 'height'];
-    
+
     protected $dates = ['deleted_at'];
-    
+
     public function cells()
     {
         return $this->hasMany(Cell::class);
     }
-    
+
     public function at($x, $y)
     {
-        return $this->cells()->where('x', $x)->where('y', $y)->get();
+        if ($x < 0 || $x >= $this->width || $y < 0 || $y >= $this->height) {
+            throw new OutOfBoundsException;
+        }
+
+        $cell = $this->cells()->where('x', $x)->where('y', $y)->first();
+
+        if (!$cell) {
+            $cell = $this->cells()->create(compact('x', 'y'));
+        }
+
+        return $cell;
     }
-    
-    public function getAt($x, $y, $key, $default = null)
+
+    public function offsetGet($offset)
     {
-        return array_get($this->at($x, $y)->data, $default);
-    }
-    
-    public function setAt($x, $y, $key, $value)
-    {
-        return array_set($this->at($x, $y)->data, $key, $value);
+        if (is_string($offset) && preg_match('/^(\d+):(\d+)$/', $offset, $matches)) {
+            list(, $x, $y) = $matches;
+            return $this->at($x, $y);
+        }
+
+        return parent::offsetGet($offset);
     }
 }
