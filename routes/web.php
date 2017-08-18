@@ -14,3 +14,8 @@
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/map', function () {
+    $map = App\Models\Map::first();
+    return view('map', compact('map'));
+});

@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use OutOfBoundsException;
 
-class Map extends Model
+class Map extends Model implements Arrayable
 {
     use SoftDeletes,
         Concerns\HasUuid;
@@ -14,6 +15,11 @@ class Map extends Model
     protected $fillable = ['name', 'width', 'height'];
 
     protected $dates = ['deleted_at'];
+
+    public function __toString()
+    {
+        return (string) view('models.map', ['map' => $this]);
+    }
 
     public function cells()
     {
@@ -43,5 +49,18 @@ class Map extends Model
         }
 
         return parent::offsetGet($offset);
+    }
+
+    public function toArray(): array
+    {
+        $map = [];
+
+        for ($x = 0; $x < $this->width; $x++) {
+            for ($y = 0; $y < $this->height; $y++) {
+                $map[$x][$y] = $this->at($x, $y);
+            }
+        }
+
+        return $map;
     }
 }

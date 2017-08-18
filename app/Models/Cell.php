@@ -61,16 +61,6 @@ class Cell extends Model
         return $value;
     }
 
-    // public function push($key, ...$values)
-    // {
-
-    // }
-
-    // public function pop($key, $default = null)
-    // {
-
-    // }
-
     public function multi(callable $fn)
     {
         try {
@@ -80,6 +70,33 @@ class Cell extends Model
         } finally {
             $this->autocommit = true;
         }
+    }
+
+    public function getAdjacents(): array
+    {
+        $adjacents = [];
+        $map = $this->map;
+
+        for ($i = -1; $i < 2; $i++) {
+            for ($j = -1; $j < 2; $j++) {
+                $x = $this->x + $i;
+                $y = $this->y + $j;
+
+                // exclude $this
+                if ($i == 0 && $j == 0) {
+                    continue;
+                }
+
+                // stay within the map constraints
+                if ($x < 0 || $x > $map->width -1 || $y < 0 || $y > $map->height -1) {
+                    continue;
+                }
+
+                $adjacents[] = $map->at($x, $y);
+            }
+        }
+
+        return $adjacents;
     }
 
     public function offsetExists($offset)
