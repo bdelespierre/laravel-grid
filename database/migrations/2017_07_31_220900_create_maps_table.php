@@ -1,8 +1,9 @@
 <?php
 
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
+use App\Models\Map;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 class CreateMapsTable extends Migration
 {
@@ -16,8 +17,9 @@ class CreateMapsTable extends Migration
         Schema::create('maps', function (Blueprint $table) {
             $table->uuid('id');
             $table->string('name');
-            $table->integer('width')->unsigned();
-            $table->integer('height')->unsigned();
+            $table->integer('width'); // -1 for infinity
+            $table->integer('height'); // -1 for infinity
+            $table->string('type')->default(Map::TYPE_OVERHEAD);
             $table->timestamps();
             $table->softDeletes();
             $table->primary('id');

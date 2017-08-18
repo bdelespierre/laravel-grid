@@ -12,7 +12,11 @@ class Map extends Model implements Arrayable
     use SoftDeletes,
         Concerns\HasUuid;
 
-    protected $fillable = ['name', 'width', 'height'];
+    const TYPE_OVERHEAD = "overhead";
+    const TYPE_ANGLED_ISOMETRIC = "angled_isometric";
+    const TYPE_LAYERED_ISOMETRIC = "layered_isometric";
+
+    protected $fillable = ['name', 'width', 'height', 'type'];
 
     protected $dates = ['deleted_at'];
 
@@ -28,23 +32,22 @@ class Map extends Model implements Arrayable
 
     public function at($x, $y)
     {
-        if ($x < 0 || $x >= $this->width || $y < 0 || $y >= $this->height) {
+        if ($this->width != -1 && ($x < 0 || $x >= $this->width)) {
             throw new OutOfBoundsException;
         }
 
-        $cell = $this->cells()->where('x', $x)->where('y', $y)->first();
-
-        if (!$cell) {
-            $cell = $this->cells()->create(compact('x', 'y'));
+        if ($this->height != -1 && ($y < 0 || $y >= $this->height)) {
+            throw new OutOfBoundsException;
         }
 
-        return $cell;
+        return $this->cells()->where('x', $x)->where('y', $y)->first()
+            ?: $this->cells()->create(compact('x', 'y'));
     }
 
     public function offsetGet($offset)
     {
-        if (is_string($offset) && preg_match('/^(\d+):(\d+)$/', $offset, $matches)) {
-            list(, $x, $y) = $matches;
+        if (is_string($offset) && preg_match('/(\d+)\s*(:|x|-|,)\s*(\d+)/', $offset, $matches)) {
+            list(, $x,, $y) = $matches;
             return $this->at($x, $y);
         }
 
