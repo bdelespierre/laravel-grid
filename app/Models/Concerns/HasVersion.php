@@ -22,7 +22,7 @@ trait HasVersion
      * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return bool
      *
-     * @throws \LogicException [<description>]
+     * @throws \LogicException
      */
     protected function performUpdate(Builder $query)
     {

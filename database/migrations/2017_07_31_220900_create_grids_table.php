@@ -1,11 +1,11 @@
 <?php
 
-use App\Models\Map;
+use App\Models\Grid;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateMapsTable extends Migration
+class CreateGridsTable extends Migration
 {
     /**
      * Run the migrations.
@@ -14,12 +14,11 @@ class CreateMapsTable extends Migration
      */
     public function up()
     {
-        Schema::create('maps', function (Blueprint $table) {
+        Schema::create('grids', function (Blueprint $table) {
             $table->uuid('id');
             $table->string('name');
             $table->integer('width'); // -1 for infinity
             $table->integer('height'); // -1 for infinity
-            $table->string('type')->default(Map::TYPE_OVERHEAD);
             $table->timestamps();
             $table->softDeletes();
             $table->primary('id');
@@ -33,6 +32,6 @@ class CreateMapsTable extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('maps');
+        Schema::dropIfExists('grids');
     }
 }

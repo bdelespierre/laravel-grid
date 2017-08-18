@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use OutOfBoundsException;
+use InvalidArgumentException;
 
 class Cell extends Model
 {
@@ -12,7 +14,7 @@ class Cell extends Model
 
     protected $fillable = ['x', 'y', 'data'];
 
-    protected $casts = ['data' => 'array'];
+    protected $casts = ['x' => 'integer', 'y' => 'integer', 'data' => 'array'];
 
     protected $autocommit = true;
 
@@ -26,9 +28,9 @@ class Cell extends Model
         return $this->getAdjacents();
     }
 
-    public function map()
+    public function grid()
     {
-        return $this->belongsTo(Map::class);
+        return $this->belongsTo(Grid::class);
     }
 
     /**
@@ -70,6 +72,7 @@ class Cell extends Model
     {
         $data = $this->data ?: [];
         $value = array_pull($data, $key, $default);
+        $this->data = $data;
 
         if ($this->autocommit) {
             $this->save();
@@ -108,48 +111,28 @@ class Cell extends Model
     public function getAdjacent($direction): self
     {
         $dir = strtolower(str_replace([' ', '-', ':'], '', $direction));
-
-        if (in_array($this->map->type, [Map::TYPE_OVERHEAD, Map::TYPE_ANGLED_ISOMETRIC])) {
-            return static::getAdjacentForOverhead($dir, $this->map, $this->x, $this->y);
-        }
-
-        if ($this->map->type == Map::TYPE_LAYERED_ISOMETRIC) {
-            return static::getAdjacentForLayeredIsometric($dir, $this->map, $this->x, $this->y);
-        }
-    }
-
-    protected static function getAdjacentForOverhead($dir, $map, $x, $y): self
-    {
-        switch ($dir) {
-            case 'n'  : case 'north'     : list($x , $y) = [$x   , $y-1];
-            case 'ne' : case 'northeast' : list($x , $y) = [$x+1 , $y-1];
-            case 'e'  : case 'east'      : list($x , $y) = [$x+1 , $y  ];
-            case 'se' : case 'southeast' : list($x , $y) = [$x+1 , $y+1];
-            case 's'  : case 'south'     : list($x , $y) = [$x   , $y+1];
-            case 'sw' : case 'southwest' : list($x , $y) = [$x-1 , $y+1];
-            case 'w'  : case 'west'      : list($x , $y) = [$x-1 , $y  ];
-            case 'nw' : case 'northwest' : list($x , $y) = [$x-1 , $y-1];
-        }
-
-        return $map->at($x, $y);
-    }
-
-    protected static function getAdjacentForLayeredIsometric($dir, $map, $x, $y): self
-    {
-        $o = $y % 2 == 0 ? 1 : 0;
+        $x   = $this->x;
+        $y   = $this->y;
 
         switch ($dir) {
-            case 'n'  : case 'north'     : list($x , $y) = [$x   , $y-2];
-            case 'ne' : case 'northeast' : list($x , $y) = [$x   , $y-1];
-            case 'e'  : case 'east'      : list($x , $y) = [$x+1 , $y  ];
-            case 'se' : case 'southeast' : list($x , $y) = [$x   , $y+1];
-            case 's'  : case 'south'     : list($x , $y) = [$x   , $y+2];
-            case 'sw' : case 'southwest' : list($x , $y) = [$x-1 , $y+1];
-            case 'w'  : case 'west'      : list($x , $y) = [$x-1 , $y  ];
-            case 'nw' : case 'northwest' : list($x , $y) = [$x-1 , $y-1];
+            case 'n'  : case 'north'     : list($x , $y) = [$x   , $y-1]; break;
+            case 'ne' : case 'northeast' : list($x , $y) = [$x+1 , $y-1]; break;
+            case 'e'  : case 'east'      : list($x , $y) = [$x+1 , $y  ]; break;
+            case 'se' : case 'southeast' : list($x , $y) = [$x+1 , $y+1]; break;
+            case 's'  : case 'south'     : list($x , $y) = [$x   , $y+1]; break;
+            case 'sw' : case 'southwest' : list($x , $y) = [$x-1 , $y+1]; break;
+            case 'w'  : case 'west'      : list($x , $y) = [$x-1 , $y  ]; break;
+            case 'nw' : case 'northwest' : list($x , $y) = [$x-1 , $y-1]; break;
+
+            default:
+                throw new InvalidArgumentException("Invalid direction: $direction");
         }
 
-        return $map->at($x + $o, $y);
+        try {
+            return $this->grid->at($x, $y);
+        } catch (OutOfBoundsException $e) {
+            return null;
+        }
     }
 
     /**

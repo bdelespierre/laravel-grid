@@ -6,23 +6,25 @@ use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use OutOfBoundsException;
+use LogicException;
 
-class Map extends Model implements Arrayable
+class Grid extends Model implements Arrayable
 {
     use SoftDeletes,
         Concerns\HasUuid;
 
-    const TYPE_OVERHEAD = "overhead";
-    const TYPE_ANGLED_ISOMETRIC = "angled_isometric";
-    const TYPE_LAYERED_ISOMETRIC = "layered_isometric";
-
-    protected $fillable = ['name', 'width', 'height', 'type'];
+    protected $fillable = ['name', 'width', 'height'];
 
     protected $dates = ['deleted_at'];
 
     public function __toString()
     {
-        return (string) view('models.map', ['map' => $this]);
+        return (string) view('models.grid', ['grid' => $this]);
+    }
+
+    public function getInfiniteAttribute()
+    {
+        return $this->width == -1 || $this->height == -1;
     }
 
     public function cells()
@@ -56,14 +58,18 @@ class Map extends Model implements Arrayable
 
     public function toArray(): array
     {
-        $map = [];
+        if ($this->infinite) {
+            throw new LogicException("Cannot convert infinite grid to array");
+        }
+
+        $grid = [];
 
         for ($x = 0; $x < $this->width; $x++) {
             for ($y = 0; $y < $this->height; $y++) {
-                $map[$x][$y] = $this->at($x, $y);
+                $grid[$x][$y] = $this->at($x, $y);
             }
         }
 
-        return $map;
+        return $grid;
     }
 }
