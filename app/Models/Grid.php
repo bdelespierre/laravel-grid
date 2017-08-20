@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use OutOfBoundsException;
 use LogicException;
+use InvalidArgumentException;
 
 class Grid extends Model implements Arrayable
 {
@@ -32,7 +33,7 @@ class Grid extends Model implements Arrayable
         return $this->hasMany(Cell::class);
     }
 
-    public function at($x, $y)
+    public function at($x, $y): Cell
     {
         if ($this->width != -1 && ($x < 0 || $x >= $this->width)) {
             throw new OutOfBoundsException;
@@ -44,6 +45,23 @@ class Grid extends Model implements Arrayable
 
         return $this->cells()->where('x', $x)->where('y', $y)->first()
             ?: $this->cells()->create(compact('x', 'y'));
+    }
+
+    public function rect($x1, $y1, $x2, $y2): array
+    {
+        $cells = [];
+
+        if ($x2 - $x1 <= 0 && $y2 - $y1 <= 0) {
+            throw new InvalidArgumentException("Not a rectangle: [$x1,$y1] [$x2,$y2]");
+        }
+
+        for ($x = $x1; $x <= $x1; $x++) {
+            for ($y = $y1; $y < $y2; $y++) {
+                $cells[$x][$y] = $this->at($x, $y);
+            }
+        }
+
+        return $cells;
     }
 
     public function offsetGet($offset)

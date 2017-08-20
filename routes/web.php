@@ -17,3 +17,13 @@ use App\Domain\Point;
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/map/{grid}', function(Grid $grid) {
+    $cells = $grid->cells()
+        ->where('x', '>=', 0)->where('x', '<', 40)
+        ->where('y', '>=', 0)->where('y', '<', 40)
+        ->orderBy('y', 'x')
+        ->get();
+
+    return view('map', compact('cells', 'grid'));
+});

@@ -4,9 +4,9 @@ namespace App\Domain\Cell\Automaton;
 
 use App\Contracts\Cell\Automaton;
 use App\Models\Cell;
-use App\Models\Map;
+use App\Models\Grid;
 
-class KissTheCook implements Automaton
+class KissTheCook
 {
     // check these values here
     // https://gamedevelopment.tutsplus.com/tutorials/generate-random-cave-levels-using-cellular-automata--gamedev-9664
@@ -17,36 +17,36 @@ class KissTheCook implements Automaton
 
     protected $tap;
 
-    public static function totalSteps(Map $map)
+    public static function totalSteps(Grid $grid, $x1, $y1, $x2, $y2)
     {
-        return ($map->width * $map->height) * (2 + static::STEPS);
+        return ($x2 - $x1) * ($y2 - $y1) * (2 + static::STEPS);
     }
 
-    public function run(Map $map, callable $tap = null)
+    public function run(Grid $grid, $x1, $y1, $x2, $y2, callable $tap = null)
     {
         $this->tap = $tap;
 
-        $grid = $this->initialize($map);
+        $chunk = [];
+        for ($x = $x1; $x <= $x2; $x++) {
+            for ($y = $y1; $y <= $y2; $y++) {
+                $cell = $grid->at($x, $y);
 
-        for ($i = 0; $i < self::STEPS; $i++) {
-            $grid = $this->doSimulationStep($grid);
-        }
-
-        return $this->finalize($map, $grid);
-    }
-
-    protected function initialize(Map $map): array
-    {
-        $grid = [];
-
-        for ($x = 0; $x < $map->width; $x++) {
-            for ($y = 0; $y < $map->height; $y++) {
-                if (static::rand() < static::START_ALIVE) {
-                    $grid[$x][$y] = true;
-                } else {
-                    $grid[$x][$y] = false;
+                if (!isset($cell['alive'])) {
+                    $cell['alive'] = self::rand() <= self::START_ALIVE;
                 }
 
+                $chunk[$cell->x][$cell->y] = $cell['alive'];
+                $this->tap();
+            }
+        }
+
+        for ($i = 0; $i < self::STEPS; $i++) {
+            $chunk = $this->doSimulationStep($chunk, $grid, $x1, $y1, $x2, $y2);
+        }
+
+        for ($x = $x1; $x <= $x2; $x++) {
+            for ($y = $y1; $y <= $y2; $y++) {
+                $grid->at($x, $y)->set('alive', (bool) $chunk[$x][$y]);
                 $this->tap();
             }
         }
@@ -54,28 +54,16 @@ class KissTheCook implements Automaton
         return $grid;
     }
 
-    protected function finalize(Map $map, array $grid): Map
+    protected function doSimulationStep(array $old, Grid $grid, $x1, $y1, $x2, $y2): array
     {
-        for ($x = 0; $x < $map->width; $x++) {
-            for ($y = 0; $y < $map->height; $y++) {
-                $map->at($x, $y)['alive'] = $grid[$x][$y];
+        $new = [];
 
-                $this->tap();
-            }
-        }
-
-        return $map;
-    }
-
-    protected function doSimulationStep(array $old): array
-    {
-        $new    = [];
-        $height = count($old);
-        $width  = count($old[0]);
-
-        for ($x = 0; $x < $width; $x++) {
-            for ($y = 0; $y < $height; $y++) {
-                $aliveNeighbours = static::countAliveNeighbours($old, $x, $y);
+        for ($x = $x1; $x <= $x2; $x++) {
+            for ($y = $y1; $y <= $y2; $y++) {
+                $aliveNeighbours = 0;
+                foreach ($grid->at($x, $y)->adjacents as $cell) {
+                    $aliveNeighbours += (int) $cell['alive'];
+                }
 
                 if ($old[$x][$y]) {
                     // if a cell is alive but has too few neighbours, kill it.
@@ -98,36 +86,6 @@ class KissTheCook implements Automaton
         }
 
         return $new;
-    }
-
-    protected static function countAliveNeighbours($grid, $x, $y): int
-    {
-        $alive  = 0;
-        $height = count($grid);
-        $width  = count($grid[0]);
-
-        for ($i = -1; $i < 2; $i++) {
-            for ($j = -1; $j < 2; $j++) {
-                $nx = $x + $i;
-                $ny = $y + $j;
-
-                // exclude current
-                if ($i == 0 && $j == 0) {
-                    continue;
-                }
-
-                // stay within the map constraints (or don't)
-                else if ($nx < 0 || $nx > $width -1 || $ny < 0 || $ny > $height -1) {
-                    $alive++;
-                }
-
-                else {
-                    $alive += (int) $grid[$nx][$ny];
-                }
-            }
-        }
-
-        return $alive;
     }
 
     protected static function rand($min = 0, $max = 1)
