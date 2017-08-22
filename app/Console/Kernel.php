@@ -13,7 +13,11 @@ class Kernel extends ConsoleKernel
      * @var array
      */
     protected $commands = [
-        //
+        Commands\CreateGridCommand::class,
+        Commands\ListGridsCommand::class,
+        Commands\FillGridCommand::class,
+        Commands\FlushGridCommand::class,
+        Commands\TerraformGridCommand::class,
     ];
 
     /**

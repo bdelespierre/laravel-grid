@@ -16,7 +16,7 @@ class Cell extends Model
 
     protected $casts = ['x' => 'integer', 'y' => 'integer', 'data' => 'array'];
 
-    protected $autocommit = true;
+    public $autocommit = true;
 
     public function getCoordinatesAttribute()
     {

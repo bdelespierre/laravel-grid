@@ -43,8 +43,7 @@ class Grid extends Model implements Arrayable
             throw new OutOfBoundsException;
         }
 
-        return $this->cells()->where('x', $x)->where('y', $y)->first()
-            ?: $this->cells()->create(compact('x', 'y'));
+        return $this->cells()->firstOrCreate(compact('x', 'y'));
     }
 
     public function rect($x1, $y1, $x2, $y2): array
@@ -72,22 +71,5 @@ class Grid extends Model implements Arrayable
         }
 
         return parent::offsetGet($offset);
-    }
-
-    public function toArray(): array
-    {
-        if ($this->infinite) {
-            throw new LogicException("Cannot convert infinite grid to array");
-        }
-
-        $grid = [];
-
-        for ($x = 0; $x < $this->width; $x++) {
-            for ($y = 0; $y < $this->height; $y++) {
-                $grid[$x][$y] = $this->at($x, $y);
-            }
-        }
-
-        return $grid;
     }
 }
