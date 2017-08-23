@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Grid;
-use App\Domain\Point;
 
 /*
 |--------------------------------------------------------------------------
@@ -18,6 +17,11 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/map/list', function () {
+    $grids = Grid::all();
+    return view('map.index', compact('grids'));
+});
+
 Route::get('/map/{grid}', function(Grid $grid) {
     $cells = $grid->cells()
         ->whereBetween('x', [0, 99])
@@ -27,5 +31,5 @@ Route::get('/map/{grid}', function(Grid $grid) {
             return "{$cell->x}:{$cell->y}";
         });
 
-    return view('map', compact('cells'));
+    return view('map.view', compact('cells', 'grid'));
 });

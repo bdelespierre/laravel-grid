@@ -19,6 +19,7 @@ class CreateGridsTable extends Migration
             $table->string('name');
             $table->integer('width'); // -1 for infinity
             $table->integer('height'); // -1 for infinity
+            $table->json('data')->nullable();
             $table->timestamps();
             $table->softDeletes();
             $table->primary('id');

@@ -9,14 +9,17 @@ use OutOfBoundsException;
 use LogicException;
 use InvalidArgumentException;
 
-class Grid extends Model implements Arrayable
+class Grid extends Model
 {
     use SoftDeletes,
-        Concerns\HasUuid;
+        Concerns\HasUuid,
+        Concerns\HasData;
 
-    protected $fillable = ['name', 'width', 'height'];
+    protected $fillable = ['name', 'width', 'height', 'data'];
 
     protected $dates = ['deleted_at'];
+
+    protected $casts = ['width' => 'integer', 'height' => 'integer', 'data' => 'array'];
 
     public function __toString()
     {

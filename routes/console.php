@@ -19,18 +19,24 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->describe('Display an inspiring quote');
 
-Artisan::command('create:chunk {grid} {x1} {y1} {x2} {y2}', function ($grid, $x1, $y1, $x2, $y2) {
-    $grid = Grid::findOrFail($grid);
-    $bar = $this->output->createProgressBar(KissTheCook::totalSteps($grid, $x1, $y1, $x2, $y2));
-    (new KissTheCook)->run($grid, $x1, $y1, $x2, $y2, function () use ($bar) { $bar->advance(); });
-    $bar->finish();
-})->describe('');
+Artisan::command('grid:experiment', function () {
+    App\Models\Grid::truncate(); // reset the grid databasse
 
-Artisan::command('map', function() {
-    $grid = Grid::create(['name' => str_random(), 'width' => -1, 'height' => -1]);
-    Artisan::call('create:chunk', ['grid' => $grid->id, 'x1' =>   0, 'y1' =>  0, 'x2' => 19, 'y2' => 19]);
-    Artisan::call('create:chunk', ['grid' => $grid->id, 'x1' =>   0, 'y1' => 20, 'x2' => 19, 'y2' => 39]);
-    Artisan::call('create:chunk', ['grid' => $grid->id, 'x1' =>  20, 'y1' =>  0, 'x2' => 39, 'y2' => 19]);
-    Artisan::call('create:chunk', ['grid' => $grid->id, 'x1' =>  20, 'y1' => 20, 'x2' => 39, 'y2' => 39]);
-    $this->line($grid->id);
+    foreach (range(1,1) as $i) {
+        $grid = App\Models\Grid::create([
+            'name' => str_random(),
+            'width' => 64,
+            'height' => 64,
+            'data' => [
+                'terrain' => [
+                    'seed' => 123,
+                ]
+            ]
+        ]);
+
+        $this->call('grid:fill', ['grid' => $grid->id, '--flush' => true]);
+        $this->call('grid:terraform', ['grid' => $grid->id, '--snapshot' => true]);
+    }
+
+    $this->call('grid:list');
 });

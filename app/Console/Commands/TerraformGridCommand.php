@@ -7,6 +7,7 @@ use App\Models\Grid;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use SplObjectStorage;
+use Webpatser\Uuid\Uuid;
 
 class TerraformGridCommand extends Command
 {
@@ -15,7 +16,7 @@ class TerraformGridCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'grid:terraform {grid} {--x1=} {--y1=} {--x2=} {--y2=} {--steps=3}';
+    protected $signature = 'grid:terraform {grid} {--x1=} {--y1=} {--x2=} {--y2=} {--steps=3} {--snapshot}';
 
     /**
      * The console command description.
@@ -52,7 +53,10 @@ class TerraformGridCommand extends Command
             return $this->error("Not a rectangle: [$x1,$y1] [$x2,$y2]");
         }
 
+        // --------------------------------------------------------------------
         // fetch grid's cells and index them by coordinates
+        // --------------------------------------------------------------------
+
         $cells = $grid->cells()
             ->whereBetween('x', [$x1, $x2])
             ->whereBetween('y', [$y1, $y2])
@@ -62,7 +66,10 @@ class TerraformGridCommand extends Command
             })
             ->all();
 
+        // --------------------------------------------------------------------
         // prepare neighborhood cache
+        // --------------------------------------------------------------------
+
         $neighbors = new SplObjectStorage;
 
         foreach ($cells as $cell) {
@@ -84,13 +91,20 @@ class TerraformGridCommand extends Command
             $neighbors[$cell] = $cellNeighbors;
         }
 
+        // --------------------------------------------------------------------
         // generate noise
-        $definitions = [
-            'water'  => ['ratio' => [0,   .07], 'weight' => .00, 'solid' => true ],   //  7% water
-            'grass'  => ['ratio' => [.07, .70], 'weight' => .65, 'solid' => false],   // 63% grass
-            'gravel' => ['ratio' => [.70, .80], 'weight' => .85, 'solid' => false],   // 10% gravel
-            'stone'  => ['ratio' => [.8, 1.00], 'weight' => .99, 'solid' => true ],   // 20% stone
-        ];
+        // --------------------------------------------------------------------
+
+        $definitions = $grid->get('terrain.definitions', [
+            'water'  => ['ratio' => [0,   .07], 'weight' => -1.3, 'waterThreshold' =>  0, 'solid' => true ], //  7%
+            'grass'  => ['ratio' => [.07, .70], 'weight' =>  .60, 'waterThreshold' =>  2, 'solid' => false], // 63%
+            'gravel' => ['ratio' => [.70, .80], 'weight' =>  .85, 'waterThreshold' =>  5, 'solid' => false], // 10%
+            'stone'  => ['ratio' => [.8, 1.00], 'weight' =>  .99, 'waterThreshold' => 10, 'solid' => true ], // 20%
+        ]);
+
+        if ($grid->has('terrain.seed')) {
+            mt_srand((int) $grid['terrain.seed']);
+        }
 
         foreach ($cells as &$cell) {
             $rand = self::random();
@@ -102,9 +116,12 @@ class TerraformGridCommand extends Command
             }
         }
 
+        // --------------------------------------------------------------------
         // run cellular automata steps
+        // --------------------------------------------------------------------
+
         $steps = $this->hasOption("steps") ? $this->option("steps") : 3;
-        $bar   = $this->output->createProgressBar(count($cells) * 2 * $steps);
+        $bar   = $this->output->createProgressBar(count($cells) * $steps);
 
         for ($step = 0; $step < $steps; $step++) {
             $next = new SplObjectStorage;
@@ -118,15 +135,23 @@ class TerraformGridCommand extends Command
                     $num ++;
                 }
 
-                $avg = $sum / $num;
+                $avg  = $sum / $num;
+                $tile = null;
 
-                foreach ($definitions as $name => $definition) {
-                    if ($avg >= $definition['ratio'][0] && $avg < $definition['ratio'][1]) {
-                        $tile = $name;
+                if ($avg < 0) {
+                    $tile = "water";
+                } elseif ($avg > 1) {
+                    $tile = "stone";
+                } else {
+                    foreach ($definitions as $name => $definition) {
+                        if ($avg >= $definition['ratio'][0] && $avg < $definition['ratio'][1]) {
+                            $tile = $name;
+                            break;
+                        }
                     }
                 }
 
-                if ($tile != $cell['tile']) {
+                if ($tile && $tile != $cell['tile']) {
                     $next[$cell] = $tile;
                 }
 
@@ -136,13 +161,156 @@ class TerraformGridCommand extends Command
             // update cells
             foreach ($next as $cell) {
                 $cell['tile'] = $next[$cell];
-                $bar->advance();
             }
         }
 
         $bar->finish();
 
+        // --------------------------------------------------------------------
+        // run water automata steps
+        // --------------------------------------------------------------------
+
+        // each direction is given as a vector [x,y]
+        $directions = [
+            [0, -1], // go north
+            [+1, 0], // go east
+            [0, +1], // go south
+            [-1, 0], // go west
+        ];
+
+        if ($grid->has('terrain.seed')) {
+            srand($grid->get('terrain.seed'));
+        }
+
+        $rivers = new SplObjectStorage;
+
+        $connectWaterTiles = function (Cell $cell) use (&$connectWaterTiles, &$connected, $neighbors) {
+            foreach ($neighbors[$cell] as $neighbor) {
+                if ($neighbor['tile'] != 'water') {
+                    continue;
+                }
+
+                if (!$connected->contains($neighbor)) {
+                    $connected->attach($neighbor);
+                    $connectWaterTiles($neighbor);
+                }
+            }
+        };
+
+
+        foreach ($cells as $cell) {
+            if ($cell['tile'] == 'water') {
+                $connected = new SplObjectStorage;
+                $connected->attach($cell);
+                $connectWaterTiles($cell);
+
+                // exclude water bodies of less than 3 cells
+                if (count($connected) >= 3) {
+                    foreach ($connected as $cell) {
+                        $rivers->attach($cell);
+                        $cell['tile']  = 'river';
+                        $cell['river'] = [
+                            'flow'     => $directions[array_rand($directions)],
+                            'strength' => 20,
+                        ];
+                    }
+                }
+            }
+        }
+
+        $flowOut = function (Cell $cell, SplObjectStorage $updates, $continue = true) use (&$flowOut, $cells, $definitions) {
+            list($x, $y) = $cell['river.flow'];
+            $coordinates = ($cell->x + $x) . ':' . ($cell->y + $y);
+
+            if (!isset($cells[$coordinates])) {
+                return false;
+            }
+
+            $neighbor = $cells[$coordinates];
+
+            if ($neighbor['tile'] == 'river') {
+                return false;
+            }
+
+            if ($neighbor['tile'] == 'water') {
+                $updates[$cell] = ['river' => null];
+                $updates[$neighbor] = [
+                    'tile'  => 'river',
+                    'river' => $cell['river']
+                ];
+
+                return $neighbor;
+            }
+
+            if ($cell['river.strength'] >= ($threshold = $definitions[$neighbor['tile']]['waterThreshold'])) {
+                $updates[$cell] = ['river' => null];
+                $updates[$neighbor] = [
+                    'tile'  => 'river',
+                    'river' => [
+                        'flow'     => $cell['river.flow'],
+                        'strength' => $cell['river.strength'] - $threshold
+                    ]
+                ];
+
+                return $neighbor;
+            }
+
+            if ($continue) {
+                // immediately flow perendicular to the current direction
+                foreach ($x ? [[0,1],[0,-1]] : [[-1,0],[1,0]] as $flow) {
+                    $cell['river.flow'] = $flow;
+
+                    if ($result = $flowOut($cell, $updates, false)) {
+                        return $result;
+                    }
+                }
+            }
+
+            return false;
+        };
+
+        do {
+            $movements = 0;
+            $newRivers = new SplObjectStorage;
+            $updates   = new SplObjectStorage;
+
+            foreach ($rivers as $cell) {
+                if ($newRiver = $flowOut($cell, $updates)) {
+                    $newRivers->attach($newRiver);
+                    $movements++;
+                }
+            }
+
+            // update cells
+            foreach ($updates as $cell) {
+                foreach ($updates[$cell] as $k => $v) {
+                    if ($v === null) {
+                        unset($v);
+                    } else {
+                        $cell[$k] = $v;
+                    }
+                }
+            }
+
+            $rivers = $newRivers;
+        } while ($movements);
+
+        // --------------------------------------------------------------------
         // write changes on database
+        // --------------------------------------------------------------------
+
+        $this->save($grid, $cells);
+
+        $this->info("\rGrid {$grid->id} terraformed successfully.");
+    }
+
+    protected function runCellularAutomata($cells, $steps, $neighbors)
+    {
+
+    }
+
+    protected function save($grid, $cells)
+    {
         $chunkSize = 200;
         $chunk = [];
         $bar = $this->output->createProgressBar(ceil(count($cells) / $chunkSize));
@@ -177,18 +345,5 @@ class TerraformGridCommand extends Command
     protected static function random($min = 0, $max = 1)
     {
         return $min + mt_rand() / mt_getrandmax() * ($max - $min);
-    }
-
-    protected static function debug($cells)
-    {
-        foreach ($cells as $cell) {
-            if (!isset($count[$cell['tile']])) {
-                $count[$cell['tile']] = 0;
-            }
-
-            $count[$cell['tile']]++;
-        }
-
-        return $count;
     }
 }
