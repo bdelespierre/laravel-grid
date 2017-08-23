@@ -54,6 +54,23 @@ class TerraformGridCommand extends Command
         }
 
         // --------------------------------------------------------------------
+        // terrain generation definition & seeds
+        // --------------------------------------------------------------------
+
+
+        $definitions = $grid->get('terrain.definitions', [
+            'water'  => ['ratio' => [0,   .07], 'weight' => -1.3, 'waterThreshold' =>  0, 'solid' => true ], //  7%
+            'grass'  => ['ratio' => [.07, .70], 'weight' =>  .60, 'waterThreshold' =>  2, 'solid' => false], // 63%
+            'gravel' => ['ratio' => [.70, .80], 'weight' =>  .85, 'waterThreshold' =>  5, 'solid' => false], // 10%
+            'stone'  => ['ratio' => [.8, 1.00], 'weight' =>  .99, 'waterThreshold' => 10, 'solid' => true ], // 20%
+        ]);
+
+        if ($grid->has('terrain.seed')) {
+            mt_srand((int) $grid['terrain.seed']);
+            srand($grid['terrain.seed']);
+        }
+
+        // --------------------------------------------------------------------
         // fetch grid's cells and index them by coordinates
         // --------------------------------------------------------------------
 
@@ -70,6 +87,38 @@ class TerraformGridCommand extends Command
         // prepare neighborhood cache
         // --------------------------------------------------------------------
 
+        $neighbors = $this->initializeNeighbors($cells);
+
+        // --------------------------------------------------------------------
+        // generate noise
+        // --------------------------------------------------------------------
+
+        $this->initializeCellularAutomata($cells, $definitions);
+
+        // --------------------------------------------------------------------
+        // run cellular automata steps
+        // --------------------------------------------------------------------
+
+        $steps = $this->hasOption("steps") ? $this->option("steps") : 3;
+        $this->runCellularAutomata($cells, $steps, $neighbors);
+
+        // --------------------------------------------------------------------
+        // run water automata steps
+        // --------------------------------------------------------------------
+
+        $this->initializeRiverAutomata($cells);
+        $this->runRiverAutomata($cells);
+
+        // --------------------------------------------------------------------
+        // write changes on database
+        // --------------------------------------------------------------------
+
+        $this->save($grid, $cells);
+        $this->info("\rGrid {$grid->id} terraformed successfully.");
+    }
+
+    protected function initializeNeighbors($cells)
+    {
         $neighbors = new SplObjectStorage;
 
         foreach ($cells as $cell) {
@@ -91,21 +140,12 @@ class TerraformGridCommand extends Command
             $neighbors[$cell] = $cellNeighbors;
         }
 
-        // --------------------------------------------------------------------
+        return $neighbors;
+    }
+
+    protected function initializeCellularAutomata(&$cells, $definitions)
+    {
         // generate noise
-        // --------------------------------------------------------------------
-
-        $definitions = $grid->get('terrain.definitions', [
-            'water'  => ['ratio' => [0,   .07], 'weight' => -1.3, 'waterThreshold' =>  0, 'solid' => true ], //  7%
-            'grass'  => ['ratio' => [.07, .70], 'weight' =>  .60, 'waterThreshold' =>  2, 'solid' => false], // 63%
-            'gravel' => ['ratio' => [.70, .80], 'weight' =>  .85, 'waterThreshold' =>  5, 'solid' => false], // 10%
-            'stone'  => ['ratio' => [.8, 1.00], 'weight' =>  .99, 'waterThreshold' => 10, 'solid' => true ], // 20%
-        ]);
-
-        if ($grid->has('terrain.seed')) {
-            mt_srand((int) $grid['terrain.seed']);
-        }
-
         foreach ($cells as &$cell) {
             $rand = self::random();
             foreach ($definitions as $name => $definition) {
@@ -115,12 +155,10 @@ class TerraformGridCommand extends Command
                 }
             }
         }
+    }
 
-        // --------------------------------------------------------------------
-        // run cellular automata steps
-        // --------------------------------------------------------------------
-
-        $steps = $this->hasOption("steps") ? $this->option("steps") : 3;
+    protected function runCellularAutomata(&$cells, $steps, $neighbors)
+    {
         $bar   = $this->output->createProgressBar(count($cells) * $steps);
 
         for ($step = 0; $step < $steps; $step++) {
@@ -165,11 +203,10 @@ class TerraformGridCommand extends Command
         }
 
         $bar->finish();
+    }
 
-        // --------------------------------------------------------------------
-        // run water automata steps
-        // --------------------------------------------------------------------
-
+    protected function initializeRiverAutomata(&$cells)
+    {
         // each direction is given as a vector [x,y]
         $directions = [
             [0, -1], // go north
@@ -217,7 +254,10 @@ class TerraformGridCommand extends Command
                 }
             }
         }
+    }
 
+    protected function runRiverAutomata(&$cells, $definitions)
+    {
         $flowOut = function (Cell $cell, SplObjectStorage $updates, $continue = true) use (&$flowOut, $cells, $definitions) {
             list($x, $y) = $cell['river.flow'];
             $coordinates = ($cell->x + $x) . ':' . ($cell->y + $y);
@@ -294,19 +334,6 @@ class TerraformGridCommand extends Command
 
             $rivers = $newRivers;
         } while ($movements);
-
-        // --------------------------------------------------------------------
-        // write changes on database
-        // --------------------------------------------------------------------
-
-        $this->save($grid, $cells);
-
-        $this->info("\rGrid {$grid->id} terraformed successfully.");
-    }
-
-    protected function runCellularAutomata($cells, $steps, $neighbors)
-    {
-
     }
 
     protected function save($grid, $cells)
