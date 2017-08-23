@@ -16,7 +16,7 @@ class TerraformGridCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'grid:terraform {grid} {--x1=} {--y1=} {--x2=} {--y2=} {--steps=3} {--snapshot}';
+    protected $signature = 'grid:terraform {grid} {--x1=} {--y1=} {--x2=} {--y2=} {--steps=3}';
 
     /**
      * The console command description.
@@ -57,12 +57,11 @@ class TerraformGridCommand extends Command
         // terrain generation definition & seeds
         // --------------------------------------------------------------------
 
-
-        $definitions = $grid->get('terrain.definitions', [
-            'water'  => ['ratio' => [0,   .07], 'weight' => -1.3, 'waterThreshold' =>  0, 'solid' => true ], //  7%
-            'grass'  => ['ratio' => [.07, .70], 'weight' =>  .60, 'waterThreshold' =>  2, 'solid' => false], // 63%
-            'gravel' => ['ratio' => [.70, .80], 'weight' =>  .85, 'waterThreshold' =>  5, 'solid' => false], // 10%
-            'stone'  => ['ratio' => [.8, 1.00], 'weight' =>  .99, 'waterThreshold' => 10, 'solid' => true ], // 20%
+        $this->definitions = $grid->get('terrain.definitions', [
+            'water'  => ['ratio' => [0,   .07], 'weight' => -1.3, 'resistance' =>  0, 'solid' => true ], //  7%
+            'grass'  => ['ratio' => [.07, .70], 'weight' =>  .60, 'resistance' =>  2, 'solid' => false], // 63%
+            'gravel' => ['ratio' => [.70, .80], 'weight' =>  .85, 'resistance' =>  5, 'solid' => false], // 10%
+            'stone'  => ['ratio' => [.8, 1.00], 'weight' =>  .99, 'resistance' => 10, 'solid' => true ], // 20%
         ]);
 
         if ($grid->has('terrain.seed')) {
@@ -74,7 +73,7 @@ class TerraformGridCommand extends Command
         // fetch grid's cells and index them by coordinates
         // --------------------------------------------------------------------
 
-        $cells = $grid->cells()
+        $this->cells = $grid->cells()
             ->whereBetween('x', [$x1, $x2])
             ->whereBetween('y', [$y1, $y2])
             ->get()
@@ -84,44 +83,36 @@ class TerraformGridCommand extends Command
             ->all();
 
         // --------------------------------------------------------------------
-        // prepare neighborhood cache
+        // run the terraforming algorithm
         // --------------------------------------------------------------------
 
-        $neighbors = $this->initializeNeighbors($cells);
-
-        // --------------------------------------------------------------------
-        // generate noise
-        // --------------------------------------------------------------------
-
-        $this->initializeCellularAutomata($cells, $definitions);
-
-        // --------------------------------------------------------------------
-        // run cellular automata steps
-        // --------------------------------------------------------------------
+        $this->initializeNeighbors();
+        $this->initializeCellularAutomata();
 
         $steps = $this->hasOption("steps") ? $this->option("steps") : 3;
-        $this->runCellularAutomata($cells, $steps, $neighbors);
+        $this->runCellularAutomata($steps);
+
+        foreach ([10, 5] as $strength)
+            $rivers = $this->initializeRiverAutomata($strength);
+            $this->runRiverAutomata($rivers);
+        }
+
+        $this->runCellularAutomata(1);
 
         // --------------------------------------------------------------------
-        // run water automata steps
+        // we're done, save everything!
         // --------------------------------------------------------------------
 
-        $this->initializeRiverAutomata($cells);
-        $this->runRiverAutomata($cells);
+        $this->save($grid);
 
-        // --------------------------------------------------------------------
-        // write changes on database
-        // --------------------------------------------------------------------
-
-        $this->save($grid, $cells);
         $this->info("\rGrid {$grid->id} terraformed successfully.");
     }
 
-    protected function initializeNeighbors($cells)
+    protected function initializeNeighbors()
     {
-        $neighbors = new SplObjectStorage;
+        $this->neighbors = new SplObjectStorage;
 
-        foreach ($cells as $cell) {
+        foreach ($this->cells as $cell) {
             $cell->autocommit = false;
             $cellNeighbors = [];
 
@@ -131,24 +122,22 @@ class TerraformGridCommand extends Command
                         continue; // ignore self
                     }
 
-                    if (isset($cells["{$x}:{$y}"])) {
-                        $cellNeighbors[] = $cells["{$x}:{$y}"];
+                    if (isset($this->cells["{$x}:{$y}"])) {
+                        $cellNeighbors[] = $this->cells["{$x}:{$y}"];
                     }
                 }
             }
 
-            $neighbors[$cell] = $cellNeighbors;
+            $this->neighbors[$cell] = $cellNeighbors;
         }
-
-        return $neighbors;
     }
 
-    protected function initializeCellularAutomata(&$cells, $definitions)
+    protected function initializeCellularAutomata()
     {
         // generate noise
-        foreach ($cells as &$cell) {
+        foreach ($this->cells as &$cell) {
             $rand = self::random();
-            foreach ($definitions as $name => $definition) {
+            foreach ($this->definitions as $name => $definition) {
                 if ($rand >= $definition['ratio'][0] && $rand < $definition['ratio'][1]) {
                     $cell['tile'] = $name;
                     break;
@@ -157,19 +146,19 @@ class TerraformGridCommand extends Command
         }
     }
 
-    protected function runCellularAutomata(&$cells, $steps, $neighbors)
+    protected function runCellularAutomata($steps)
     {
-        $bar   = $this->output->createProgressBar(count($cells) * $steps);
+        $bar   = $this->output->createProgressBar(count($this->cells) * $steps);
 
         for ($step = 0; $step < $steps; $step++) {
             $next = new SplObjectStorage;
 
-            foreach ($cells as $cell) {
-                $sum = $definitions[$cell['tile']]['weight'];
+            foreach ($this->cells as $cell) {
+                $sum = $this->definitions[$cell['tile']]['weight'];
                 $num = 1;
 
-                foreach ($neighbors[$cell] as $neighbor) {
-                    $sum += $definitions[$neighbor['tile']]['weight'];
+                foreach ($this->neighbors[$cell] as $neighbor) {
+                    $sum += $this->definitions[$neighbor['tile']]['weight'];
                     $num ++;
                 }
 
@@ -181,7 +170,7 @@ class TerraformGridCommand extends Command
                 } elseif ($avg > 1) {
                     $tile = "stone";
                 } else {
-                    foreach ($definitions as $name => $definition) {
+                    foreach ($this->definitions as $name => $definition) {
                         if ($avg >= $definition['ratio'][0] && $avg < $definition['ratio'][1]) {
                             $tile = $name;
                             break;
@@ -205,7 +194,7 @@ class TerraformGridCommand extends Command
         $bar->finish();
     }
 
-    protected function initializeRiverAutomata(&$cells)
+    protected function initializeRiverAutomata($strength)
     {
         // each direction is given as a vector [x,y]
         $directions = [
@@ -215,14 +204,10 @@ class TerraformGridCommand extends Command
             [-1, 0], // go west
         ];
 
-        if ($grid->has('terrain.seed')) {
-            srand($grid->get('terrain.seed'));
-        }
-
         $rivers = new SplObjectStorage;
 
-        $connectWaterTiles = function (Cell $cell) use (&$connectWaterTiles, &$connected, $neighbors) {
-            foreach ($neighbors[$cell] as $neighbor) {
+        $connectWaterTiles = function (Cell $cell) use (&$connectWaterTiles, &$connected) {
+            foreach ($this->neighbors[$cell] as $neighbor) {
                 if ($neighbor['tile'] != 'water') {
                     continue;
                 }
@@ -234,8 +219,7 @@ class TerraformGridCommand extends Command
             }
         };
 
-
-        foreach ($cells as $cell) {
+        foreach ($this->cells as $cell) {
             if ($cell['tile'] == 'water') {
                 $connected = new SplObjectStorage;
                 $connected->attach($cell);
@@ -248,25 +232,27 @@ class TerraformGridCommand extends Command
                         $cell['tile']  = 'river';
                         $cell['river'] = [
                             'flow'     => $directions[array_rand($directions)],
-                            'strength' => 20,
+                            'strength' => $strength,
                         ];
                     }
                 }
             }
         }
+
+        return $rivers;
     }
 
-    protected function runRiverAutomata(&$cells, $definitions)
+    protected function runRiverAutomata($rivers)
     {
-        $flowOut = function (Cell $cell, SplObjectStorage $updates, $continue = true) use (&$flowOut, $cells, $definitions) {
+        $flowOut = function (Cell $cell, SplObjectStorage $updates, $continue = true) use (&$flowOut) {
             list($x, $y) = $cell['river.flow'];
             $coordinates = ($cell->x + $x) . ':' . ($cell->y + $y);
 
-            if (!isset($cells[$coordinates])) {
+            if (!isset($this->cells[$coordinates])) {
                 return false;
             }
 
-            $neighbor = $cells[$coordinates];
+            $neighbor = $this->cells[$coordinates];
 
             if ($neighbor['tile'] == 'river') {
                 return false;
@@ -282,13 +268,13 @@ class TerraformGridCommand extends Command
                 return $neighbor;
             }
 
-            if ($cell['river.strength'] >= ($threshold = $definitions[$neighbor['tile']]['waterThreshold'])) {
+            if ($cell['river.strength'] >= ($resistance = $this->definitions[$neighbor['tile']]['resistance'])) {
                 $updates[$cell] = ['river' => null];
                 $updates[$neighbor] = [
                     'tile'  => 'river',
                     'river' => [
                         'flow'     => $cell['river.flow'],
-                        'strength' => $cell['river.strength'] - $threshold
+                        'strength' => $cell['river.strength'] - $resistance
                     ]
                 ];
 
@@ -334,13 +320,23 @@ class TerraformGridCommand extends Command
 
             $rivers = $newRivers;
         } while ($movements);
+
+        foreach ($this->cells as $cell) {
+            if ($cell['tile'] == 'river') {
+                $cell['tile'] = 'water';
+            }
+
+            if (isset($cell['river'])) {
+                unset($cell['river']);
+            }
+        }
     }
 
-    protected function save($grid, $cells)
+    protected function save($grid)
     {
         $chunkSize = 200;
         $chunk = [];
-        $bar = $this->output->createProgressBar(ceil(count($cells) / $chunkSize));
+        $bar = $this->output->createProgressBar(ceil(count($this->cells) / $chunkSize));
 
         $table = (new Cell)->getTable();
         $pdo = DB::connection()->getPdo();
@@ -348,7 +344,7 @@ class TerraformGridCommand extends Command
             return $pdo->exec("replace into {$table} (`id`,`grid_id`,`x`,`y`,`data`) values " . implode(',', $chunk));
         };
 
-        foreach ($cells as $cell) {
+        foreach ($this->cells as $cell) {
             $chunk[] = vsprintf("(%s,%s,%s,%s,%s)", array_map([$pdo, 'quote'], [
                 $cell->id, $grid->id, $cell->x, $cell->y,
                 json_encode($cell->data),
