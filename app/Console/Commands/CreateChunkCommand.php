@@ -43,15 +43,6 @@ class CreateChunkCommand extends Command
             throw new RuntimeException("Invalid chunk coordinates: please provide coordinates");
         }
 
-        $existing = $grid->chunks()
-            ->where('x1', '>=', $x)->where('x2', '<=', $x)
-            ->where('y1', '>=', $y)->where('y2', '<=', $y)
-            ->get();
-
-        if (count($existing)) {
-            throw new RuntimeException("Invalid chunk coordinates: collsion with chunk " . $existing->first()->id);
-        }
-
         $chunk = $grid->chunks()->create([
             'x1' => $x,
             'y1' => $y,

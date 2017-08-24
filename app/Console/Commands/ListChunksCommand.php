@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Grid;
 use Illuminate\Console\Command;
 
 class ListChunksCommand extends Command
@@ -30,7 +31,7 @@ class ListChunksCommand extends Command
         $headers = ['UUID', 'Created At', 'Coords', 'Width', 'Height', 'Cells'];
         $chunks  = [];
 
-        foreach (Grid::findOrFail('grid')->chunks as $chunk) {
+        foreach (Grid::findOrFail($this->argument('grid'))->chunks as $chunk) {
             $chunks[] = [
                 $chunk->id,
                 $chunk->created_at,

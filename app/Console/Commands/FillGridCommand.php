@@ -14,7 +14,7 @@ class FillGridCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'grid:fill {grid} {--x1=} {--y1=} {--x2=} {--y2=} {--chunk=200} {--flush}';
+    protected $signature = 'grid:fill {grid} {--x1=} {--y1=} {--x2=} {--y2=} {--b|batch-size=200} {--f|flush}';
 
     /**
      * The console command description.
@@ -57,27 +57,27 @@ class FillGridCommand extends Command
 
         $bar = $this->output->createProgressBar(($x2 - $x1) * ($y2 - $y1));
 
-        $chunkSize = $this->option('chunk');
-        $chunk = [];
+        $batchSize = $this->option('batch-size');
+        $batch = [];
 
         for ($x = $x1; $x <= $x2; $x++) {
             for ($y = $y1; $y <= $y2; $y++) {
-                $chunk[] = compact('x', 'y') + [
+                $batch[] = compact('x', 'y') + [
                     'id'      => Uuid::generate()->string,
                     'grid_id' => $grid->id
                 ];
 
-                if (count($chunk) >= $chunkSize) {
-                    Cell::insert($chunk);
-                    $chunk = [];
+                if (count($batch) >= $batchSize) {
+                    Cell::insert($batch);
+                    $batch = [];
                 }
 
                 $bar->advance();
             }
         }
 
-        if ($chunk) {
-            Cell::insert($chunk);
+        if ($batch) {
+            Cell::insert($batch);
         }
 
         $bar->finish();

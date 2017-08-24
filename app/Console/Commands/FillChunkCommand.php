@@ -13,7 +13,7 @@ class FillChunkCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'chunk:fill {chunk} {--f|flush} {--b|batch-size=200}';
+    protected $signature = 'chunk:fill {grid} {--f|flush} {--b|batch-size=200}';
 
     /**
      * The console command description.
@@ -35,25 +35,13 @@ class FillChunkCommand extends Command
             $this->call('chunk:flush', ['chunk' => $chunk->id]);
         }
 
-        $this->fill($chunk);
-
-        $this->info("\Chunk {$chunk->id} filled successfully.");
-    }
-
-    public function fill(Chunk $chunk, $size = null)
-    {
-        $size = $size ?: $this->option('batch-size');
-
-        foreach ($chunk->fill() as $cell) {
-            $batch[] = $cell;
-
-            if (count($batch) >= $size) {
-                Cell::insert($batch) && $batch = [];
-            }
-        }
-
-        if ($batch) {
-            Cell::insert($batch);
-        }
+        $this->call('grid:fill', [
+            'grid' => $chunk->grid->id,
+            '-b'   => $this->option('batch-size'),
+            '--x1' => $chunk->x1,
+            '--y1' => $chunk->y1,
+            '--x2' => $chunk->x2,
+            '--y2' => $chunk->y2,
+        ]);
     }
 }
