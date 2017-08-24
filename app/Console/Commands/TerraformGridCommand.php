@@ -65,8 +65,9 @@ class TerraformGridCommand extends Command
         ]);
 
         if ($grid->has('terrain.seed')) {
-            mt_srand((int) $grid['terrain.seed']);
-            srand($grid['terrain.seed']);
+            $seed = (int) $grid['terrain.seed'] + crc32("{$x1}{$y1}{$x2}{$y2}");
+            mt_srand($seed);
+            srand($seed);
         }
 
         // --------------------------------------------------------------------

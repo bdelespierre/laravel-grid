@@ -19,8 +19,10 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->describe('Display an inspiring quote');
 
-Artisan::command('grid:experiment', function () {
-    App\Models\Grid::truncate(); // reset the grid databasse
+Artisan::command('grid:experiment {--flush=1} {--patch=1}', function () {
+    if ($this->option('flush')) {
+        App\Models\Grid::truncate(); // reset the grid databasse
+    }
 
     $grid = App\Models\Grid::create([
         'name'    => str_random(),
@@ -47,25 +49,20 @@ Artisan::command('grid:experiment', function () {
         $this->call('grid:terraform', $params);
     }
 
-    $patches = [
-        [
-            '--x1' => 59, '--y1' =>   0,
-            '--x2' => 67, '--y2' => 127,
-        ],
-        [
-            '--x1' =>   0, '--y1' => 59,
-            '--x2' => 127, '--y2' => 67,
-        ],
-    ];
+    if ($this->option('patch')) {
+        $patches = [
+            ['--x1' => 59, '--y1' =>  0, '--x2' =>  67, '--y2' => 127],
+            ['--x1' =>  0, '--y1' => 59, '--x2' => 127, '--y2' =>  67]
+        ];
 
-    $params = [
-        'grid'     => $grid->id,
-        '--seed'   => false,
-        '--rivers' => false,
-    ];
-
-    foreach ($patches as $coords) {
-        $this->call('grid:terraform', $params + $coords);
+        foreach ($patches as $coords) {
+            $this->call('grid:terraform', $coords + [
+                'grid'     => $grid->id,
+                '--seed'   => false,
+                '--rivers' => false,
+                '--steps'  => 1,
+            ]);
+        }
     }
 
     $this->call('grid:list');
