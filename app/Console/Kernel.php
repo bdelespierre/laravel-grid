@@ -18,6 +18,11 @@ class Kernel extends ConsoleKernel
         Commands\FillGridCommand::class,
         Commands\FlushGridCommand::class,
         Commands\TerraformGridCommand::class,
+
+        Commands\CreateChunkCommand::class,
+        Commands\ListChunksCommand::class,
+        Commands\FillChunkCommand::class,
+        Commands\FlushChunkCommand::class,
     ];
 
     /**

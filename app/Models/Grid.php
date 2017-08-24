@@ -12,6 +12,7 @@ use InvalidArgumentException;
 class Grid extends Model
 {
     use SoftDeletes,
+        Concerns\HasVersion,
         Concerns\HasUuid,
         Concerns\HasData;
 
@@ -34,6 +35,11 @@ class Grid extends Model
     public function cells()
     {
         return $this->hasMany(Cell::class);
+    }
+
+    public function chunks()
+    {
+        return $this->hasMany(Chunk::class);
     }
 
     public function at($x, $y): Cell

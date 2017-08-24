@@ -17,8 +17,6 @@ class Cell extends Model
 
     protected $casts = ['x' => 'integer', 'y' => 'integer', 'data' => 'array'];
 
-    public $autocommit = true;
-
     public function getCoordinatesAttribute()
     {
         return [$this->x, $this->y];
@@ -34,20 +32,14 @@ class Cell extends Model
         return $this->belongsTo(Grid::class);
     }
 
-    /**
-     * ------------------------------------------------------------------------
-     * Adjacent cells
-     * ------------------------------------------------------------------------
-     */
-
     public function getAdjacents(): Collection
     {
-        $set = new Collection;
-        foreach (['n','ne','e','se','s','sw','w','nw'] as $dir) {
-            $set[] = $this->getAdjacent($dir);
-        }
-
-        return $set;
+        return $this->grid->cells()
+            ->whereBetween('x', [$this->x - 1, $this->x + 1])
+            ->whereBetween('y', [$this->y - 1, $this->y + 1])
+            ->where('x', '!=', $this->x)
+            ->where('y', '!=', $this->y)
+            ->get();
     }
 
     public function getAdjacent($direction): self

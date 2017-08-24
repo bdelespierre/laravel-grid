@@ -7,15 +7,13 @@ use Webpatser\Uuid\Uuid;
 trait HasUuid
 {
     /**
-     * Sets the `incrementing` property to false, the id will be generated
-     * on creation.
+     * Uuid models are no longer capable to auto-increment index
      *
-     * @param  array  $attributes
+     * @return bool
      */
-    public function __construct(array $attributes = [])
+    public function getIncrementing()
     {
-        parent::__construct($attributes);
-        $this->incrementing = false;
+        return false;
     }
 
     /**
