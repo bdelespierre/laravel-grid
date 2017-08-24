@@ -24,8 +24,8 @@ Route::get('/map/list', function () {
 
 Route::get('/map/{grid}', function(Grid $grid) {
     $cells = $grid->cells()
-        ->whereBetween('x', [0, 99])
-        ->whereBetween('y', [0, 99])
+        ->whereBetween('x', [0, 127])
+        ->whereBetween('y', [0, 127])
         ->get()
         ->keyBy(function($cell) {
             return "{$cell->x}:{$cell->y}";

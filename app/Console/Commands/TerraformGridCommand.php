@@ -16,7 +16,7 @@ class TerraformGridCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'grid:terraform {grid} {--x1=} {--y1=} {--x2=} {--y2=} {--steps=3}';
+    protected $signature = 'grid:terraform {grid} {--x1=} {--y1=} {--x2=} {--y2=} {--steps=3} {--seed=1} {--rivers=1}';
 
     /**
      * The console command description.
@@ -92,12 +92,14 @@ class TerraformGridCommand extends Command
         $steps = $this->hasOption("steps") ? $this->option("steps") : 3;
         $this->runCellularAutomata($steps);
 
-        foreach ([10, 5] as $strength) {
-            $rivers = $this->initializeRiverAutomata($strength);
-            $this->runRiverAutomata($rivers);
-        }
+        if ($this->option('rivers')) {
+            foreach ([10, 5] as $strength) {
+                $rivers = $this->initializeRiverAutomata($strength);
+                $this->runRiverAutomata($rivers);
+            }
 
-        $this->runCellularAutomata(1);
+            $this->runCellularAutomata(1);
+        }
 
         // --------------------------------------------------------------------
         // we're done, save everything!
@@ -112,19 +114,7 @@ class TerraformGridCommand extends Command
     {
         $this->neighbors = new SplObjectStorage;
 
-        // expand selection to adjacent chunks (if any)
-        $cells = $this->cells + $this->grid->cells()
-            ->whereBetween('x', [$x1 - 1, $x2 + 1])
-            ->whereBetween('y', [$y1 - 1, $y2 + 1])
-            ->whereNotBetween('x', [$x1, $x2])
-            ->whereNotBetween('y', [$y1, $y2])
-            ->get()
-            ->keyBy(function($cell) {
-                return "{$cell->x}:{$cell->y}";
-            })
-            ->all();
-
-        foreach ($cells as $cell) {
+        foreach ($this->cells as $cell) {
             $cell->autocommit = false;
             $cellNeighbors = [];
 
@@ -146,13 +136,15 @@ class TerraformGridCommand extends Command
 
     protected function initializeCellularAutomata()
     {
-        // generate noise
-        foreach ($this->cells as &$cell) {
-            $rand = self::random();
-            foreach ($this->definitions as $name => $definition) {
-                if ($rand >= $definition['ratio'][0] && $rand < $definition['ratio'][1]) {
-                    $cell['tile'] = $name;
-                    break;
+        if ($this->option('seed')) {
+            // generate noise
+            foreach ($this->cells as &$cell) {
+                $rand = self::random();
+                foreach ($this->definitions as $name => $definition) {
+                    if ($rand >= $definition['ratio'][0] && $rand < $definition['ratio'][1]) {
+                        $cell['tile'] = $name;
+                        break;
+                    }
                 }
             }
         }

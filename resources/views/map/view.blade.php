@@ -39,9 +39,9 @@
 </head>
 <body>
     <table class="map">
-        @for ($i = 0; $i < ($grid->width == -1 ? 100 : $grid->width); $i++)
+        @for ($i = 0; $i < ($grid->width == -1 ? 127 : $grid->width); $i++)
             <tr>
-                @for ($j = 0; $j < ($grid->height == -1 ? 100 : $grid->height); $j++)
+                @for ($j = 0; $j < ($grid->height == -1 ? 127 : $grid->height); $j++)
                     <td class="{{ $cells["{$i}:{$j}"]['tile'] }}" title="{{ $cells["{$i}:{$j}"]->x }}:{{ $cells["{$i}:{$j}"]->y }}"></td>
                 @endfor
             </tr>

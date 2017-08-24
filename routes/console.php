@@ -23,9 +23,10 @@ Artisan::command('grid:experiment', function () {
     App\Models\Grid::truncate(); // reset the grid databasse
 
     $grid = App\Models\Grid::create([
-        'name'   => str_random(),
-        'width'  => -1, // infinite
-        'height' => -1, // infinite
+        'name'    => str_random(),
+        'width'   => -1, // infinite
+        'height'  => -1, // infinite
+        'data'    => ['terrain' => ['seed' => 123]],
     ]);
 
     $chunks = [
@@ -38,12 +39,33 @@ Artisan::command('grid:experiment', function () {
             'grid' => $grid->id,
             '--x1' => $chunk[0],
             '--y1' => $chunk[1],
-            '--x2' => $chunk[0] + 64,
-            '--y2' => $chunk[1] + 64,
+            '--x2' => $chunk[0] + 63,
+            '--y2' => $chunk[1] + 63,
         ];
 
         $this->call('grid:fill',      $params);
         $this->call('grid:terraform', $params);
+    }
+
+    $patches = [
+        [
+            '--x1' => 59, '--y1' =>   0,
+            '--x2' => 67, '--y2' => 127,
+        ],
+        [
+            '--x1' =>   0, '--y1' => 59,
+            '--x2' => 127, '--y2' => 67,
+        ],
+    ];
+
+    $params = [
+        'grid'     => $grid->id,
+        '--seed'   => false,
+        '--rivers' => false,
+    ];
+
+    foreach ($patches as $coords) {
+        $this->call('grid:terraform', $params + $coords);
     }
 
     $this->call('grid:list');
