@@ -22,20 +22,28 @@ Artisan::command('inspire', function () {
 Artisan::command('grid:experiment', function () {
     App\Models\Grid::truncate(); // reset the grid databasse
 
-    foreach (range(1,1) as $i) {
-        $grid = App\Models\Grid::create([
-            'name' => str_random(),
-            'width' => 64,
-            'height' => 64,
-            'data' => [
-                'terrain' => [
-                    'seed' => 123,
-                ]
-            ]
-        ]);
+    $grid = App\Models\Grid::create([
+        'name'   => str_random(),
+        'width'  => -1, // infinite
+        'height' => -1, // infinite
+    ]);
 
-        $this->call('grid:fill', ['grid' => $grid->id, '--flush' => true]);
-        $this->call('grid:terraform', ['grid' => $grid->id, '--snapshot' => true]);
+    $chunks = [
+        [0,  0], [64,  0],
+        [0, 64], [64, 64],
+    ];
+
+    foreach ($chunks as $chunk) {
+        $params = [
+            'grid' => $grid->id,
+            '--x1' => $chunk[0],
+            '--y1' => $chunk[1],
+            '--x2' => $chunk[0] + 64,
+            '--y2' => $chunk[1] + 64,
+        ];
+
+        $this->call('grid:fill',      $params);
+        $this->call('grid:terraform', $params);
     }
 
     $this->call('grid:list');

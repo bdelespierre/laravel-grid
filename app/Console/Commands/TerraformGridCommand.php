@@ -42,7 +42,7 @@ class TerraformGridCommand extends Command
      */
     public function handle()
     {
-        $grid = Grid::findOrFail($this->argument('grid'));
+        $this->grid = $grid = Grid::findOrFail($this->argument('grid'));
 
         $x1 = $this->option('x1') ?: 0;
         $y1 = $this->option('y1') ?: 0;
@@ -86,13 +86,13 @@ class TerraformGridCommand extends Command
         // run the terraforming algorithm
         // --------------------------------------------------------------------
 
-        $this->initializeNeighbors();
+        $this->initializeNeighbors($x1, $y1, $x2, $y2);
         $this->initializeCellularAutomata();
 
         $steps = $this->hasOption("steps") ? $this->option("steps") : 3;
         $this->runCellularAutomata($steps);
 
-        foreach ([10, 5] as $strength)
+        foreach ([10, 5] as $strength) {
             $rivers = $this->initializeRiverAutomata($strength);
             $this->runRiverAutomata($rivers);
         }
@@ -108,11 +108,23 @@ class TerraformGridCommand extends Command
         $this->info("\rGrid {$grid->id} terraformed successfully.");
     }
 
-    protected function initializeNeighbors()
+    protected function initializeNeighbors($x1, $y1, $x2, $y2)
     {
         $this->neighbors = new SplObjectStorage;
 
-        foreach ($this->cells as $cell) {
+        // expand selection to adjacent chunks (if any)
+        $cells = $this->cells + $this->grid->cells()
+            ->whereBetween('x', [$x1 - 1, $x2 + 1])
+            ->whereBetween('y', [$y1 - 1, $y2 + 1])
+            ->whereNotBetween('x', [$x1, $x2])
+            ->whereNotBetween('y', [$y1, $y2])
+            ->get()
+            ->keyBy(function($cell) {
+                return "{$cell->x}:{$cell->y}";
+            })
+            ->all();
+
+        foreach ($cells as $cell) {
             $cell->autocommit = false;
             $cellNeighbors = [];
 
