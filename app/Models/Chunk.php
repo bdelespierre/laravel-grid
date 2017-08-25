@@ -35,8 +35,7 @@ class Chunk extends Model
     {
         return $this->grid->cells()
             ->whereBetween('x', [$this->x1, $this->x2])
-            ->whereBetween('y', [$this->y1, $this->y2])
-            ->get();
+            ->whereBetween('y', [$this->y1, $this->y2]);
     }
 
     public function getRectAttribute(): array

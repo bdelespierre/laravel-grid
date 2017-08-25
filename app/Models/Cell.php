@@ -32,6 +32,15 @@ class Cell extends Model
         return $this->belongsTo(Grid::class);
     }
 
+    public function chunks()
+    {
+        return $this->grid->chunks()
+            ->where('x1', '<=', $this->x)
+            ->where('x2', '>=', $this->x)
+            ->where('y1', '<=', $this->y)
+            ->where('y2', '>=', $this->y);
+    }
+
     public function getAdjacents(): Collection
     {
         return $this->grid->cells()
