@@ -87,7 +87,7 @@ class TerraformGridCommand extends Command
         // run the terraforming algorithm
         // --------------------------------------------------------------------
 
-        $this->initializeNeighbors($x1, $y1, $x2, $y2);
+        $this->initializeNeighbors();
         $this->initializeCellularAutomata();
 
         $steps = $this->hasOption("steps") ? $this->option("steps") : 3;
@@ -102,6 +102,8 @@ class TerraformGridCommand extends Command
             $this->runCellularAutomata(1);
         }
 
+        $this->pave();
+
         // --------------------------------------------------------------------
         // we're done, save everything!
         // --------------------------------------------------------------------
@@ -111,28 +113,51 @@ class TerraformGridCommand extends Command
         $this->info("\rGrid {$grid->id} terraformed successfully.");
     }
 
-    protected function initializeNeighbors($x1, $y1, $x2, $y2)
+    protected const DIRECTIONS = [
+        'nw' => [-1,-1],
+        'n'  => [ 0,-1],
+        'ne' => [+1,-1],
+        'w'  => [-1, 0],
+        'e'  => [+1, 0],
+        'sw' => [+1,-1],
+        's'  => [ 0,+1],
+        'se' => [+1,+1],
+    ];
+
+    protected function initializeNeighbors()
     {
         $this->neighbors = new SplObjectStorage;
 
         foreach ($this->cells as $cell) {
-            $cell->autocommit = false;
             $cellNeighbors = [];
 
-            for ($x = $cell->x - 1; $x <= $cell->x + 1; $x++) {
-                for ($y = $cell->y - 1; $y <= $cell->y + 1; $y++) {
-                    if ($x == $cell->x && $y == $cell->y) {
-                        continue; // ignore self
-                    }
+            foreach (self::DIRECTIONS as $name => $offsets) {
+                list($ox, $oy) = $offsets;
 
-                    if (isset($this->cells["{$x}:{$y}"])) {
-                        $cellNeighbors[] = $this->cells["{$x}:{$y}"];
-                    }
+                $x = $cell->x + $ox;
+                $y = $cell->y + $oy;
+
+                if (isset($this->cells["{$x}:{$y}"])) {
+                    $cellNeighbors[$name] = $this->cells["{$x}:{$y}"];
                 }
             }
 
             $this->neighbors[$cell] = $cellNeighbors;
         }
+    }
+
+    protected function getNeighbor(Cell $cell, string $dir, $onlyCached = true)
+    {
+        if (isset($this->neighbors[$cell][$dir])) {
+            return $this->neighbors[$cell][$dir];
+        }
+
+        if ($onlyCached) {
+            return null;
+        }
+
+        list($ox, $oy) = self::DIRECTIONS[$dir];
+        return $this->grid->at($cell->x + $ox, $cell->y + $oy);
     }
 
     protected function initializeCellularAutomata()
@@ -143,7 +168,7 @@ class TerraformGridCommand extends Command
                 $rand = self::random();
                 foreach ($this->definitions as $name => $definition) {
                     if ($rand >= $definition['ratio'][0] && $rand < $definition['ratio'][1]) {
-                        $cell['tile'] = $name;
+                        $cell['terrain.base_tile'] = $name;
                         break;
                     }
                 }
@@ -159,11 +184,11 @@ class TerraformGridCommand extends Command
             $next = new SplObjectStorage;
 
             foreach ($this->cells as $cell) {
-                $sum = $this->definitions[$cell['tile']]['weight'];
+                $sum = $this->definitions[$cell['terrain.base_tile']]['weight'];
                 $num = 1;
 
                 foreach ($this->neighbors[$cell] as $neighbor) {
-                    $sum += $this->definitions[$neighbor['tile']]['weight'];
+                    $sum += $this->definitions[$neighbor['terrain.base_tile']]['weight'];
                     $num ++;
                 }
 
@@ -183,7 +208,7 @@ class TerraformGridCommand extends Command
                     }
                 }
 
-                if ($tile && $tile != $cell['tile']) {
+                if ($tile && $tile != $cell['terrain.base_tile']) {
                     $next[$cell] = $tile;
                 }
 
@@ -192,7 +217,7 @@ class TerraformGridCommand extends Command
 
             // update cells
             foreach ($next as $cell) {
-                $cell['tile'] = $next[$cell];
+                $cell['terrain.base_tile'] = $next[$cell];
             }
         }
 
@@ -213,7 +238,7 @@ class TerraformGridCommand extends Command
 
         $connectWaterTiles = function (Cell $cell) use (&$connectWaterTiles, &$connected) {
             foreach ($this->neighbors[$cell] as $neighbor) {
-                if ($neighbor['tile'] != 'water') {
+                if ($neighbor['terrain.base_tile'] != 'water') {
                     continue;
                 }
 
@@ -225,7 +250,7 @@ class TerraformGridCommand extends Command
         };
 
         foreach ($this->cells as $cell) {
-            if ($cell['tile'] == 'water') {
+            if ($cell['terrain.base_tile'] == 'water') {
                 $connected = new SplObjectStorage;
                 $connected->attach($cell);
                 $connectWaterTiles($cell);
@@ -234,7 +259,7 @@ class TerraformGridCommand extends Command
                 if (count($connected) >= 3) {
                     foreach ($connected as $cell) {
                         $rivers->attach($cell);
-                        $cell['tile']  = 'river';
+                        $cell['terrain.base_tile']  = 'river';
                         $cell['river'] = [
                             'flow'     => $directions[array_rand($directions)],
                             'strength' => $strength,
@@ -259,24 +284,24 @@ class TerraformGridCommand extends Command
 
             $neighbor = $this->cells[$coordinates];
 
-            if ($neighbor['tile'] == 'river') {
+            if ($neighbor['terrain.base_tile'] == 'river') {
                 return false;
             }
 
-            if ($neighbor['tile'] == 'water') {
+            if ($neighbor['terrain.base_tile'] == 'water') {
                 $updates[$cell] = ['river' => null];
                 $updates[$neighbor] = [
-                    'tile'  => 'river',
+                    'terrain.base_tile'  => 'river',
                     'river' => $cell['river']
                 ];
 
                 return $neighbor;
             }
 
-            if ($cell['river.strength'] >= ($resistance = $this->definitions[$neighbor['tile']]['resistance'])) {
+            if ($cell['river.strength'] >= ($resistance = $this->definitions[$neighbor['terrain.base_tile']]['resistance'])) {
                 $updates[$cell] = ['river' => null];
                 $updates[$neighbor] = [
-                    'tile'  => 'river',
+                    'terrain.base_tile'  => 'river',
                     'river' => [
                         'flow'     => $cell['river.flow'],
                         'strength' => $cell['river.strength'] - $resistance
@@ -327,13 +352,79 @@ class TerraformGridCommand extends Command
         } while ($movements);
 
         foreach ($this->cells as $cell) {
-            if ($cell['tile'] == 'river') {
-                $cell['tile'] = 'water';
+            if ($cell['terrain.base_tile'] == 'river') {
+                $cell['terrain.base_tile'] = 'water';
             }
 
             if (isset($cell['river'])) {
                 unset($cell['river']);
             }
+        }
+    }
+
+    protected function pave()
+    {
+        // process elevation (stone tile shifting)
+        foreach ($this->cells as $cell) {
+            if ($cell['terrain.base_tile'] == 'stone') {
+                if (!$neighbor = $this->getNeighbor($cell, 'n', false)) {
+                    continue;
+                }
+
+                if ($neighbor['terrain.base_tile'] != 'stone') {
+                    $neighbor['terrain.base_tile'] = 'stone';
+
+                    // if cell was not pulled up from cache
+                    if (!isset($this->cells[$neighbor->x . ':' . $neighbor->y])) {
+                        $neighbor->save();
+                    }
+                }
+            }
+        }
+
+        foreach ($this->cells as $cell) {
+            $neighbor = $this->getNeighbor($cell, 's', false);
+
+            if ($neighbor && $cell['terrain.base_tile'] == 'stone' && $neighbor['terrain.base_tile'] != 'stone') {
+                $cell['terrain.layers'] = ['stone-wall'];
+
+                // if cell was not pulled up from cache
+                if (!isset($this->cells[$neighbor->x . ':' . $neighbor->y])) {
+                    $neighbor->save();
+                }
+            } else {
+                $cell['terrain.layers'] = [$cell['terrain.base_tile']];
+            }
+        }
+
+        $grassVariants = [
+            'grass'   => [  0,  .8], // 80%
+            'grass-1' => [ .8,  .9], // 10%
+            'grass-2' => [ .9, .96], // 6%
+            'grass-3' => [.96,   1], // 4%
+        ];
+
+        foreach ($this->cells as $cell) {
+            $layers = $cell['terrain.layers'];
+
+            if ($layers[0] == 'stone' || $layers[0] == 'water') {
+                foreach (['n' => 'top','e' => 'right','s' => 'bottom' ,'w' => 'left'] as $dir => $variant) {
+                    if ($neighbor = $this->getNeighbor($cell, $dir, false)) {
+                        if ($neighbor['terrain.layers'][0] != $layers[0]) {
+                            $layers[] = "stone-edge-{$variant}";
+                        }
+                    }
+                }
+            } elseif ($layers[0] == 'grass') {
+                $r = self::random();
+                foreach ($grassVariants as $variant => $p) {
+                    if ($r > $p[0] && $r <= $p[1]) {
+                        $layers[] = $variant;
+                    }
+                }
+            }
+
+            $cell['terrain.layers'] = $layers;
         }
     }
 

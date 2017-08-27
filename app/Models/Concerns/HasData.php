@@ -6,8 +6,6 @@ trait HasData
 {
     protected $dataAttribute = "data";
 
-    public $autocommit = true;
-
     /**
      * ------------------------------------------------------------------------
      * Data attribute IO
@@ -30,18 +28,14 @@ trait HasData
         array_set($data, $key, $value);
         $this[$this->dataAttribute] = $data;
 
-        if ($this->autocommit) {
-            $this->save();
-        }
+        return $this;
     }
 
     public function add($key, $value)
     {
         $this[$this->dataAttribute] = array_add($this[$this->dataAttribute] ?: [], $key, $value);
 
-        if ($this->autocommit) {
-            $this->save();
-        }
+        return $this;
     }
 
     public function pull($key, $default = null)
@@ -50,22 +44,7 @@ trait HasData
         $value = array_pull($data, $key, $default);
         $this[$this->dataAttribute] = $data;
 
-        if ($this->autocommit) {
-            $this->save();
-        }
-
         return $value;
-    }
-
-    public function multi(callable $fn)
-    {
-        try {
-            $this->autocommit = false;
-            $fn($this);
-            $this->save();
-        } finally {
-            $this->autocommit = true;
-        }
     }
 
     /**

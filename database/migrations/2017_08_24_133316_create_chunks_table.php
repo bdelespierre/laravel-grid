@@ -16,10 +16,9 @@ class CreateChunksTable extends Migration
         Schema::create('chunks', function (Blueprint $table) {
             $table->uuid('id');
             $table->integer('grid_id')->unsigned();
-            $table->integer('x1');
-            $table->integer('y1');
-            $table->integer('x2');
-            $table->integer('y2');
+            $table->integer('x');
+            $table->integer('y');
+            $table->integer('size');
             $table->json('data')->nullable();
             $table->integer('version')->unsigned()->default(0);
             $table->timestamps();

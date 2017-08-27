@@ -12,18 +12,18 @@ class Chunk extends Model
         Concerns\HasUuid,
         Concerns\HasData;
 
-    protected $fillable = ['x1', 'y1', 'x2', 'y2', 'data'];
+    protected $fillable = ['x', 'y', 'size', 'data'];
 
     protected $casts = [
-        'x1' => 'integer',
-        'y1' => 'integer',
-        'x2' => 'integer',
-        'y2' => 'integer',
+        'x'    => 'integer',
+        'y'    => 'integer',
+        'size' => 'integer',
+        'data' => 'array',
     ];
 
     public function __toString()
     {
-        return "[{$this->x1}:{$this->y1}],[{$this->x2}:{$this->y2}]";
+        return vsprintf("[\d:\d],[\d:\d]", $this->getRectAttribute());
     }
 
     public function grid()
@@ -33,13 +33,14 @@ class Chunk extends Model
 
     public function cells()
     {
+        list($x1,$y1,$x2,$y2) = $this->getRectAttribute();
         return $this->grid->cells()
-            ->whereBetween('x', [$this->x1, $this->x2])
-            ->whereBetween('y', [$this->y1, $this->y2]);
+            ->whereBetween('x', [$x1, $x2])
+            ->whereBetween('y', [$y1, $y2]);
     }
 
     public function getRectAttribute(): array
     {
-        return [$this->x1, $this->y1, $this->x2, $this->y2];
+        return [$this->x, $this->y, $this->x + $this->size -1, $this->y + $this->size -1];
     }
 }

@@ -43,12 +43,7 @@ class CreateChunkCommand extends Command
             throw new RuntimeException("Invalid chunk coordinates: please provide coordinates");
         }
 
-        $chunk = $grid->chunks()->create([
-            'x1' => $x,
-            'y1' => $y,
-            'x2' => $x + $size - 1,
-            'y2' => $y + $size - 1,
-        ]);
+        $chunk = $grid->chunks()->create(compact('x', 'y', 'size'));
 
         $this->info("Chunk {$chunk->id} created successfully.");
     }
