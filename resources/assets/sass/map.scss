@@ -1,0 +1,167 @@
+
+$cell-size: 16px;
+
+@mixin mixin-box-width($size) {
+    width: $size;
+    min-width: $size;
+    max-width: $size;
+}
+
+@mixin mixin-box-height($size) {
+    height: $size;
+    min-height: $size;
+    max-height: $size;
+}
+
+@mixin mixin-box-size($size) {
+    @include mixin-box-width($size);
+    @include mixin-box-height($size);
+}
+
+.map .row {
+    overflow: auto;
+    zoom: 1;
+
+    .cell {
+        position: relative;
+        float: left;
+        @include mixin-box-size($cell-size);
+
+        .tile {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    }
+}
+
+.tile {
+    @include mixin-box-size($cell-size);
+    background-image: url('/images/tiles/16x16/basic.png');
+    background-repeat: no-repeat;
+    background-position:  -96px  -32px; /* black tile */
+
+    &.half-x {
+        @include mixin-box-width($cell-size / 2);
+    }
+
+    &.half-x-right {
+        left: 8px !important;
+        @include mixin-box-width($cell-size / 2);
+    }
+
+    &.half-y {
+        @include mixin-box-height($cell-size / 2);
+    }
+
+    &.half-y-bottom {
+        top: 8px !important;
+        @include mixin-box-height($cell-size / 2);
+    }
+
+    &.brick-wall              { background-position:    0px    0px }
+    &.brick-wall-2            { background-position:  -16px    0px }
+    &.brick-wall-3            { background-position:  -32px    0px }
+    &.brick-wall-4            { background-position:  -48px    0px }
+    &.brick-wall-5            { background-position:  -64px    0px }
+    &.brick-wall-6            { background-position:  -80px    0px }
+    &.brick-wall-7            { background-position:  -96px    0px }
+    &.brick-wall-8            { background-position: -112px    0px }
+    &.wood                    { background-position:    0px  -16px }
+    &.red                     { background-position:  -16px  -16px }
+    &.sand                    { background-position:  -32px  -16px }
+    &.grass                   { background-position:  -48px  -16px }
+    &.flowers                 { background-position:  -64px  -16px }
+    &.water                   { background-position:  -80px  -16px }
+    &.bricks                  { background-position:  -96px  -16px }
+    &.stone-wall              { background-position: -112px  -16px }
+    &.plank                   { background-position:    0px  -32px }
+    &.carpet                  { background-position:  -16px  -32px }
+    &.sand-round              { background-position:  -32px  -32px }
+    &.grass-round             { background-position:  -48px  -32px }
+    &.plan                    { background-position:  -64px  -32px }
+    &.waterfall               { background-position:  -80px  -32px }
+    &.black                   { background-position:  -96px  -32px }
+    &.stone-wall-2            { background-position: -112px  -32px }
+    &.stone-edge-top-left     { background-position:    0px  -48px }
+    &.stone-edge-top          { background-position:  -16px  -48px }
+    &.stone-edge-top-right    { background-position:  -32px  -48px }
+    &.pot                     { background-position:  -48px  -48px }
+    &.pot-broken              { background-position:  -64px  -48px }
+    &.glass                   { background-position:  -80px  -48px }
+    &.tree                    { background-position:  -96px  -48px }
+    &.well                    { background-position: -112px  -48px }
+    &.stone-edge-left         { background-position:    0px  -64px }
+    &.entrance-south          { background-position:  -16px  -64px }
+    &.stone-edge-right        { background-position:  -32px  -64px }
+    &.chest-open              { background-position:  -48px  -64px }
+    &.chest-close             { background-position:  -64px  -64px }
+    &.glass-2                 { background-position:  -80px  -64px }
+    &.tree-2                  { background-position:  -96px  -64px }
+    &.column                  { background-position: -112px  -64px }
+    &.stone-edge-bottom-left  { background-position:    0px  -80px }
+    &.stone-edge-bottom       { background-position:  -16px  -80px }
+    &.stone-edge-bottom-right { background-position:  -32px  -80px }
+    &.castle                  { background-position:  -48px  -80px }
+    &.village                 { background-position:  -64px  -80px }
+    &.bed-top                 { background-position:  -80px  -80px }
+    &.throne                  { background-position:  -96px  -80px }
+    &.statue                  { background-position: -112px  -80px }
+    &.wood-door               { background-position:    0px  -96px }
+    &.iron-door               { background-position:  -16px  -96px }
+    &.entrance-top            { background-position:  -32px  -96px }
+    &.posts                   { background-position:  -48px  -96px }
+    &.map                     { background-position:  -64px  -96px }
+    &.bed-bottom              { background-position:  -80px  -96px }
+    &.table                   { background-position:  -96px  -96px }
+    &.drawer                  { background-position: -112px  -96px }
+    &.stairs-up               { background-position:    0px -112px }
+    &.stairs-down             { background-position:  -16px -112px }
+    &.rocks                   { background-position:  -32px -112px }
+    &.posts-2                 { background-position:  -48px -112px }
+    &.torch                   { background-position:  -64px -112px }
+    &.torch-2                 { background-position:  -80px -112px }
+    &.mountain                { background-position:  -96px -112px }
+    &.mountain-2              { background-position: -112px -112px }
+    &.grass-2                 { background-position:    0px -128px }
+    &.grass-3                 { background-position:  -16px -128px }
+    &.lava-stone-wall         { background-position:  -32px -128px }
+    &.post                    { background-position:  -48px -128px }
+    &.gold                    { background-position:  -64px -128px }
+    &.gems                    { background-position:  -80px -128px }
+    &.post-armor              { background-position:  -96px -128px }
+    &.post-magic              { background-position: -112px -128px }
+    &.wood-2                  { background-position:    0px -144px }
+    &.bricks-2                { background-position:  -16px -144px }
+    &.lava                    { background-position:  -32px -144px }
+    &.lava-2                  { background-position:  -48px -144px }
+    &.tree-3                  { background-position:  -64px -144px }
+    &.tree-4                  { background-position:  -80px -144px }
+    &.post-sword              { background-position:  -96px -144px }
+    &.post-potion             { background-position: -112px -144px }
+    &.stone-bridge-vert       { background-position:    0px -160px }
+    &.stone-bridge-horz       { background-position:  -16px -160px }
+    &.wood-bridge-vert        { background-position:    0px -176px }
+    &.wood-bridge-horz        { background-position:  -16px -176px }
+    &.column-top              { background-position:  -48px -176px }
+    &.tree-5                  { background-position:  -64px -176px }
+    &.dialog-box-top-left     { background-position:  -80px -176px }
+    &.dialog-box-top          { background-position:  -96px -176px }
+    &.dialog-box-top-right    { background-position: -112px -176px }
+    &.column-bottom           { background-position:  -48px -192px }
+    &.dialog-box-left         { background-position:  -80px -192px }
+    &.dialog-box-background   { background-position:  -96px -192px }
+    &.dialog-box-right        { background-position: -112px -192px }
+    &.tree-6                  { background-position:  -48px -208px }
+    &.tree-7                  { background-position:  -64px -208px }
+    &.dialog-box-bottom-left  { background-position:  -80px -208px }
+    &.dialog-box-bottom       { background-position:  -96px -208px }
+    &.dialog-box-bottom-right { background-position: -112px -208px }
+    &.tree-8                  { background-position:  -48px -224px }
+    &.tree-9                  { background-position:  -64px -224px }
+
+    &.sand.top-left     { background-position: -40px -40px; left: 8px !important; top: 8px !important; @include mixin-box-size($cell-size / 2); }
+    &.sand.top-right    { background-position: -32px -40px; left: 0px !important; top: 8px !important; @include mixin-box-size($cell-size / 2); }
+    &.sand.bottom-left  { background-position: -40px -32px; left: 8px !important; top: 0px !important; @include mixin-box-size($cell-size / 2); }
+    &.sand.bottom-right { background-position: -32px -32px; left: 0px !important; top: 0px !important; @include mixin-box-size($cell-size / 2); }
+}

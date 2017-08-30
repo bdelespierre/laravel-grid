@@ -1,73 +1,198 @@
-@php $size = 128 @endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Map {{ $grid->name }}</title>
+    <link rel="stylesheet" type="text/css" href="{{ asset('css/app.css') }}">
     <style>
         html, body {
             margin: 0;
             padding: 0;
         }
-
-        .map .row {
-            width: {{ ($size -1) * 16 }}px;
-            overflow: auto;
-            zoom: 1;
-        }
-
-        .map .row > .tile {
-            position: relative;
-            float: left;
-        }
-
-        .tile {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 16px;
-            height: 16px;
-            min-width: 16px;
-            min-height: 16px;
-            max-width: 16px;
-            max-height: 16px;
-            margin: 0;
-            padding: 0;
-            background-image: url('/images/tiles/16x16/basic.png');
-            background-repeat: no-repeat;
-            border: none;
-        }
-
-        .tile.water             { background-position:  -80px -16px }
-        .tile.river             { background-position:  -80px -16px }
-        .tile.stone-wall        { background-position: -112px -32px }
-        .tile.gravel            { background-position:  -32px -16px }
-        .tile.stone             { background-position:  -48px -16px }
-        .tile.grass             { background-position:  -48px -16px }
-        .tile.stone-edge-top    { background-position: -16px  -48px }
-        .tile.stone-edge-right  { background-position: -32px  -64px }
-        .tile.stone-edge-bottom { background-position: -16px  -80px }
-        .tile.stone-edge-left   { background-position:   0px  -64px }
-        .tile.grass-1           { background-position:   0px -128px }
-        .tile.grass-2           { background-position: -16px -128px }
-        .tile.grass-3           { background-position: -64px  -16px }
     </style>
 </head>
 <body>
     <div class="map">
-        @for ($j = 0; $j < ($grid->width == -1 ? ($size - 1) : $grid->width); $j++)
-            <div class="row">
-                @for ($i = 0; $i < ($grid->height == -1 ? ($size - 1) : $grid->height); $i++)
-                    @php $layers = $cells["{$i}:{$j}"]['terrain.layers'] ?: ['grass'] @endphp
-                    <div class="tile {{ array_shift($layers) }}"
-                        title="{{ $cells["{$i}:{$j}"]->x }}:{{ $cells["{$i}:{$j}"]->y }}">
-                        @foreach ($layers as $class)
-                            <div class="tile {{ $class }}"></div>
-                        @endforeach
-                    </div>
+        @for ($y = 0; $y < $size; $y++)
+            <div class="row" style="width: {{ $size * 16 }}px">
+                @for ($x = 0; $x < $size; $x++)
+                    @php
+                        $cell = $cells["{$x}:{$y}"] ?? null;
+                    @endphp
+                    @if ($cell)
+                        <div id="{{ $cell->id }}"
+                            class="cell"
+                            title="{{ implode(':', $cell->coordinates) }}"
+                            data-terrain-elevation="{{ $cell['terrain.elevation'] }}"
+                            data-x="{{ $cell->x }}"
+                            data-y="{{ $cell->y }}">
+                        </div>
+                    @else
+                        <div
+                            class="tile"
+                            data-terrain-elevation="grass"
+                            data-x="{{ $x }}"
+                            data-y="{{ $y }}"></div>
+                    @endif
                 @endfor
             </div>
         @endfor
     </div>
+
+    <script
+        src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+        integrity="sha256-k2WSCIexGzOj3Euiig+TlR8gA0EmPjuc79OEeY5L45g="
+        crossorigin="anonymous"></script>
+    <script type="text/javascript">
+        var grass_variants = {
+            'grass'   : [  0,  .8], // 80%
+            'grass-2' : [ .8,  .9], // 10%
+            'grass-3' : [ .9, .96], //  6%
+            'flowers' : [.96,   1], //  4%
+        };
+
+        // because it's easier
+        var directions = {
+            // +
+            'top'         : [ 0, -1],
+            'left'        : [-1,  0],
+            'right'       : [+1,  0],
+            'bottom'      : [ 0, +1],
+
+            // x
+            'top-left'    : [-1, -1],
+            'top-right'   : [+1, -1],
+            'bottom-left' : [-1, +1],
+            'bottom-right': [+1, +1]
+        };
+
+        var map = {
+            cells: {},
+
+            has: function(x, y) {
+                return this.get(x, y) !== undefined;
+            },
+
+            get: function(x, y) {
+                return this.cells[x + ':' + y];
+            },
+
+            add: function(x, y, cell) {
+                this.cells[x + ':' + y] = cell;
+                return this;
+            },
+
+            each: function(fn) {
+                $.each(this.cells, function(i, cell) {
+                    fn.call(cell, cell, i, this.cells)
+                });
+                return this;
+            },
+
+            update: function() {
+                this.each(function(cell) {
+                    $(cell.node).html('');
+                    cell.layers.forEach(function(layer) {
+                        $(cell.node).append('<div class="tile ' + layer + '"></div>');
+                    });
+                })
+            }
+        };
+
+        $(function() {
+            $('.map .cell').each(function(i, item) {
+                var $item = $(item),
+                    x = parseInt($item.attr('data-x')),
+                    y = parseInt($item.attr('data-y')),
+                    type = $item.attr('data-terrain-elevation');
+
+                map.add(x, y, {
+                    id: $item.attr('id'),
+                    node: item,
+                    x: x,
+                    y: y,
+                    type: type,
+                    solid: type == 'stone' || type == 'water',
+                    layers: [],
+
+                    eachNeighbor: function (fn, constraint) {
+                        var that = this;
+                        $.each(directions, function(name, dir) {
+                            if (constraint == '+') {
+                                if (name == 'top-left'    || name == 'top-right' ||
+                                    name == 'bottom-left' || name == 'bottom-right') {
+                                    return;
+                                }
+                            } else if (constraint == 'x') {
+                                if (name == 'top'    || name == 'right' ||
+                                    name == 'bottom' || name == 'left') {
+                                    return;
+                                }
+                            }
+
+                            if (that.hasNeighbor(name)) {
+                                let cell = that.getNeighbor(name);
+                                return fn.call(cell, cell, name, map.cells);
+                            }
+                        });
+                    },
+
+                    getNeighbor: function(dir) {
+                        let x = this.x + directions[dir][0],
+                            y = this.y + directions[dir][1];
+
+                        return map.get(x, y);
+                    },
+
+                    hasNeighbor: function(dir) {
+                        return this.getNeighbor(dir) !== undefined;
+                    }
+                });
+            });
+
+            // elevation
+            map.each(function(cell) {
+                if (cell.type == 'stone' && cell.hasNeighbor('top') && cell.getNeighbor('top').type != 'stone') {
+                    cell.getNeighbor('top').type = 'stone';
+                }
+            });
+
+            // tiling
+            map.each(function(cell) {
+                if (cell.type == 'stone') {
+                    if (cell.hasNeighbor('bottom') && cell.getNeighbor('bottom').type != 'stone') {
+                        cell.type = 'stone-wall';
+                        cell.layers.push('stone-wall');
+                    } else {
+                        cell.layers.push('grass');
+                    }
+                } else if (cell.type == 'grass') {
+                    let rand = Math.random(); // [0,1]
+                    $.each(grass_variants, function(name, prob) {
+                        if (rand >= prob[0] && rand < prob[1]) {
+                            cell.layers.push(name);
+                        }
+                    });
+                } else if (cell.type == 'gravel') {
+                    cell.layers.push('sand');
+                } else if (cell.type == 'water') {
+                    cell.layers.push('water');
+                }
+            });
+
+            // hard edges
+            map.each(function(cell) {
+                if (cell.type == 'stone' || cell.type == 'water') {
+                    cell.eachNeighbor(function(adjacent, dir) {
+                        if (cell.type != adjacent.type) {
+                            cell.layers.push('stone-edge-' + dir);
+                        }
+                    }, '+');
+                }
+            });
+
+            map.update();
+        });
+    </script>
 </body>
 </html>

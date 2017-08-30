@@ -22,14 +22,19 @@ Route::get('/map/list', function () {
     return view('map.index', compact('grids'));
 });
 
+Route::get('/map/tiles', function() {
+    return view('map.tiles');
+});
+
 Route::get('/map/{grid}', function(Grid $grid) {
+    $size = 64;
     $cells = $grid->cells()
-        ->whereBetween('x', [0, 127])
-        ->whereBetween('y', [0, 127])
+        ->whereBetween('x', [0, $size -1])
+        ->whereBetween('y', [0, $size -1])
         ->get()
         ->keyBy(function($cell) {
             return "{$cell->x}:{$cell->y}";
         });
 
-    return view('map.view', compact('cells', 'grid'));
+    return view('map.view', compact('cells', 'grid', 'size'));
 });
