@@ -31,39 +31,13 @@ Artisan::command('grid:experiment {--flush=1} {--patch=1}', function () {
         'data'    => ['terrain' => ['seed' => 123]],
     ]);
 
-    $chunks = [
-        [0,  0], [64,  0],
-        [0, 64], [64, 64],
-    ];
+    $chunk = $grid->chunks()->create([
+        'x' => 0,
+        'y' => 0,
+        'size' => 64
+    ]);
 
-    foreach ($chunks as $chunk) {
-        $params = [
-            'grid' => $grid->id,
-            '--x1' => $chunk[0],
-            '--y1' => $chunk[1],
-            '--x2' => $chunk[0] + 63,
-            '--y2' => $chunk[1] + 63,
-        ];
+    $chunk->terraform();
 
-        $this->call('grid:fill',      $params);
-        $this->call('grid:terraform', $params);
-    }
-
-    if ($this->option('patch')) {
-        $patches = [
-            ['--x1' => 59, '--y1' =>  0, '--x2' =>  67, '--y2' => 127],
-            ['--x1' =>  0, '--y1' => 59, '--x2' => 127, '--y2' =>  67]
-        ];
-
-        foreach ($patches as $coords) {
-            $this->call('grid:terraform', $coords + [
-                'grid'     => $grid->id,
-                '--seed'   => false,
-                '--rivers' => false,
-                '--steps'  => 1,
-            ]);
-        }
-    }
-
-    $this->call('grid:list');
+    $this->call('chunk:list', ['grid' => $grid->id]);
 });

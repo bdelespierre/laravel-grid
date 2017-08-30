@@ -23,6 +23,7 @@ class Kernel extends ConsoleKernel
         Commands\ListChunksCommand::class,
         Commands\FillChunkCommand::class,
         Commands\FlushChunkCommand::class,
+        Commands\TerraformChunkCommand::class,
     ];
 
     /**

@@ -23,7 +23,7 @@ class TerraformGridCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Generates terrain';
+    protected $description = 'Generates terrain in the given rectangle';
 
     /**
      * Create a new command instance.

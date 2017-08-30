@@ -29,7 +29,7 @@
                         </div>
                     @else
                         <div
-                            class="tile"
+                            class="cell"
                             data-terrain-elevation="grass"
                             data-x="{{ $x }}"
                             data-y="{{ $y }}"></div>
